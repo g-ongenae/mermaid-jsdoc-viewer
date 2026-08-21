@@ -1,0 +1,51 @@
+{
+  "name": "mermaid-jsdoc-viewer",
+  "displayName": "Mermaid JSDoc Viewer",
+  "description": "Open Mermaid diagrams found in JSDoc comments directly in the Mermaid Live editor",
+  "version": "0.0.1",
+  "publisher": "local",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onLanguage:javascript",
+    "onLanguage:javascriptreact",
+    "onLanguage:typescript",
+    "onLanguage:typescriptreact"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "mermaidJsdocViewer.openDiagram",
+        "title": "Mermaid JSDoc: Open in Mermaid Live"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "mermaidJsdocViewer.openDiagram",
+          "when": "editorLangId =~ /^javascript(react)?$|^typescript(react)?$/",
+          "group": "navigation"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "dependencies": {
+    "pako": "^2.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/pako": "^2.0.3",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.4.0"
+  }
+}
