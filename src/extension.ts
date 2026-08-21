@@ -100,8 +100,18 @@ async function openInMermaidLive(code: string): Promise<void> {
 
 let displayPanel: vscode.WebviewPanel | undefined;
 
+function getNonce(): string {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let nonce = '';
+  for (let i = 0; i < 32; i++) {
+    nonce += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return nonce;
+}
+
 function displayDiagram(code: string): void {
   const imageUrl = buildMermaidInkUrl(code);
+  const nonce = getNonce();
 
   if (displayPanel) {
     displayPanel.reveal(vscode.ViewColumn.Beside, true);
@@ -110,7 +120,7 @@ function displayDiagram(code: string): void {
       'mermaidJsdocViewer.display',
       'Mermaid Diagram',
       { viewColumn: vscode.ViewColumn.Beside, preserveFocus: true },
-      { enableScripts: false }
+      { enableScripts: true }
     );
     displayPanel.onDidDispose(() => {
       displayPanel = undefined;
@@ -120,14 +130,138 @@ function displayDiagram(code: string): void {
   displayPanel.webview.html = `<!DOCTYPE html>
 <html>
 <head>
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src https://mermaid.ink;">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src https://mermaid.ink; style-src 'unsafe-inline'; script-src 'nonce-${nonce}';">
 <style>
-  body { display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: var(--vscode-editor-background); }
-  img { max-width: 100%; max-height: 100%; }
+  html, body { height: 100%; margin: 0; background: var(--vscode-editor-background); overflow: hidden; }
+  #toolbar {
+    position: fixed; top: 8px; right: 8px; z-index: 1;
+    display: flex; gap: 4px;
+  }
+  #toolbar button {
+    background: var(--vscode-button-secondaryBackground, #3a3d41);
+    color: var(--vscode-button-secondaryForeground, #fff);
+    border: none; border-radius: 4px; width: 28px; height: 28px;
+    font-size: 16px; cursor: pointer;
+  }
+  #toolbar button:hover { background: var(--vscode-button-secondaryHoverBackground, #45494e); }
+  #viewport {
+    position: relative;
+    width: 100%; height: 100%;
+    overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+    cursor: grab;
+  }
+  #viewport.dragging { cursor: grabbing; }
+  #diagram {
+    max-width: 90%; max-height: 90%;
+    user-select: none;
+    -webkit-user-drag: none;
+  }
+  #diagram.zooming {
+    position: absolute; top: 0; left: 0;
+    max-width: none; max-height: none;
+    transform-origin: 0 0;
+  }
 </style>
 </head>
 <body>
-  <img src="${imageUrl}" alt="Mermaid diagram" />
+  <div id="toolbar">
+    <button id="zoom-out" title="Zoom out">−</button>
+    <button id="zoom-reset" title="Reset zoom">⟳</button>
+    <button id="zoom-in" title="Zoom in">+</button>
+  </div>
+  <div id="viewport">
+    <img id="diagram" src="${imageUrl}" alt="Mermaid diagram" />
+  </div>
+  <script nonce="${nonce}">
+    const viewport = document.getElementById('viewport');
+    const diagram = document.getElementById('diagram');
+
+    let scale = 1, x = 0, y = 0;
+    let zoomActive = false;
+    let dragging = false, startX = 0, startY = 0;
+
+    function apply() {
+      diagram.style.transform = 'translate(' + x + 'px,' + y + 'px) scale(' + scale + ')';
+    }
+
+    // Freezes the image's current (CSS fit-to-viewport, flex-centered)
+    // on-screen box as the scale=1 baseline for the transform below, then
+    // switches it to absolute positioning so translate/scale fully
+    // describe its box going forward. Reading the real rendered rect here
+    // sidesteps ever needing the SVG's intrinsic pixel size.
+    function ensureZoomMode() {
+      if (zoomActive) return;
+      const vRect = viewport.getBoundingClientRect();
+      const iRect = diagram.getBoundingClientRect();
+      diagram.classList.add('zooming');
+      diagram.style.width = iRect.width + 'px';
+      diagram.style.height = iRect.height + 'px';
+      x = iRect.left - vRect.left;
+      y = iRect.top - vRect.top;
+      scale = 1;
+      zoomActive = true;
+      apply();
+    }
+
+    function resetZoom() {
+      zoomActive = false;
+      diagram.classList.remove('zooming');
+      diagram.style.transform = '';
+      diagram.style.width = '';
+      diagram.style.height = '';
+    }
+
+    function zoomAt(factor, clientX, clientY) {
+      ensureZoomMode();
+      const rect = viewport.getBoundingClientRect();
+      const px = clientX - rect.left;
+      const py = clientY - rect.top;
+      const newScale = Math.min(10, Math.max(0.05, scale * factor));
+      x = px - ((px - x) / scale) * newScale;
+      y = py - ((py - y) / scale) * newScale;
+      scale = newScale;
+      apply();
+    }
+
+    viewport.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
+      zoomAt(factor, e.clientX, e.clientY);
+    }, { passive: false });
+
+    viewport.addEventListener('mousedown', (e) => {
+      ensureZoomMode();
+      dragging = true;
+      startX = e.clientX - x;
+      startY = e.clientY - y;
+      viewport.classList.add('dragging');
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (!dragging) return;
+      x = e.clientX - startX;
+      y = e.clientY - startY;
+      apply();
+    });
+
+    window.addEventListener('mouseup', () => {
+      dragging = false;
+      viewport.classList.remove('dragging');
+    });
+
+    viewport.addEventListener('dblclick', resetZoom);
+
+    document.getElementById('zoom-in').addEventListener('click', () => {
+      const rect = viewport.getBoundingClientRect();
+      zoomAt(1.2, rect.left + rect.width / 2, rect.top + rect.height / 2);
+    });
+    document.getElementById('zoom-out').addEventListener('click', () => {
+      const rect = viewport.getBoundingClientRect();
+      zoomAt(1 / 1.2, rect.left + rect.width / 2, rect.top + rect.height / 2);
+    });
+    document.getElementById('zoom-reset').addEventListener('click', resetZoom);
+  </script>
 </body>
 </html>`;
 }
