@@ -32,3 +32,14 @@ npm run compile   # or `npm run watch`
 
 Press `F5` in VS Code to launch an Extension Development Host with the
 extension loaded.
+
+## Packaging / publishing
+
+The extension is bundled into a single `dist/extension.js` with esbuild
+(`npm run package`), so the published `.vsix` doesn't ship raw
+`node_modules` or dev files:
+
+```bash
+npx @vscode/vsce package   # produces mermaid-jsdoc-viewer-<version>.vsix
+npx @vscode/vsce publish   # requires `vsce login <publisher>` first
+```

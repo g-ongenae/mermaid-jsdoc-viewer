@@ -4,7 +4,16 @@
     {
       "type": "npm",
       "script": "watch",
-      "problemMatcher": "$tsc-watch",
+      "problemMatcher": {
+        "owner": "typescript",
+        "pattern": "$tsc",
+        "source": "esbuild",
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "^\\[watch\\] build started",
+          "endsPattern": "^\\[watch\\] build finished"
+        }
+      },
       "isBackground": true,
       "presentation": {
         "reveal": "never"
