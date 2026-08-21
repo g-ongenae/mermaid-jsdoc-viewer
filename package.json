@@ -22,12 +22,21 @@
       {
         "command": "mermaidJsdocViewer.openDiagram",
         "title": "Mermaid JSDoc: Open in Mermaid Live"
+      },
+      {
+        "command": "mermaidJsdocViewer.displayDiagram",
+        "title": "Mermaid JSDoc: Display Diagram"
       }
     ],
     "menus": {
       "editor/context": [
         {
           "command": "mermaidJsdocViewer.openDiagram",
+          "when": "editorLangId =~ /^javascript(react)?$|^typescript(react)?$/",
+          "group": "navigation"
+        },
+        {
+          "command": "mermaidJsdocViewer.displayDiagram",
           "when": "editorLangId =~ /^javascript(react)?$|^typescript(react)?$/",
           "group": "navigation"
         }

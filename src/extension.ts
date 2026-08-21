@@ -71,10 +71,10 @@ function findMermaidBlocks(document: vscode.TextDocument): MermaidBlock[] {
 }
 
 /**
- * Compresses mermaid source with pako and builds a mermaid.live edit URL,
- * matching the `pako:` state encoding used by https://mermaid.live.
+ * Compresses mermaid source into the `pako:` state encoding shared by
+ * https://mermaid.live and https://mermaid.ink.
  */
-function buildMermaidLiveUrl(code: string): string {
+function encodeMermaidState(code: string): string {
   const state = {
     code,
     mermaid: { theme: 'default' },
@@ -82,8 +82,15 @@ function buildMermaidLiveUrl(code: string): string {
     updateDiagram: true,
   };
   const deflated = pako.deflate(JSON.stringify(state), { level: 9 });
-  const base64 = Buffer.from(deflated).toString('base64url');
-  return `https://mermaid.live/edit#pako:${base64}`;
+  return Buffer.from(deflated).toString('base64url');
+}
+
+function buildMermaidLiveUrl(code: string): string {
+  return `https://mermaid.live/edit#pako:${encodeMermaidState(code)}`;
+}
+
+function buildMermaidInkUrl(code: string): string {
+  return `https://mermaid.ink/svg/pako:${encodeMermaidState(code)}`;
 }
 
 async function openInMermaidLive(code: string): Promise<void> {
@@ -91,15 +98,94 @@ async function openInMermaidLive(code: string): Promise<void> {
   await vscode.env.openExternal(vscode.Uri.parse(url));
 }
 
+let displayPanel: vscode.WebviewPanel | undefined;
+
+function displayDiagram(code: string): void {
+  const imageUrl = buildMermaidInkUrl(code);
+
+  if (displayPanel) {
+    displayPanel.reveal(vscode.ViewColumn.Beside, true);
+  } else {
+    displayPanel = vscode.window.createWebviewPanel(
+      'mermaidJsdocViewer.display',
+      'Mermaid Diagram',
+      { viewColumn: vscode.ViewColumn.Beside, preserveFocus: true },
+      { enableScripts: false }
+    );
+    displayPanel.onDidDispose(() => {
+      displayPanel = undefined;
+    });
+  }
+
+  displayPanel.webview.html = `<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src https://mermaid.ink;">
+<style>
+  body { display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: var(--vscode-editor-background); }
+  img { max-width: 100%; max-height: 100%; }
+</style>
+</head>
+<body>
+  <img src="${imageUrl}" alt="Mermaid diagram" />
+</body>
+</html>`;
+}
+
+/**
+ * Resolves which mermaid block a command invocation should act on: the code
+ * passed directly (from a CodeLens), or a prompt to pick one from the active
+ * editor when the command was run from the palette/context menu instead.
+ */
+async function resolveCode(code?: string): Promise<string | undefined> {
+  if (code) {
+    return code;
+  }
+
+  const editor = vscode.window.activeTextEditor;
+  if (!editor) {
+    vscode.window.showWarningMessage('No active editor.');
+    return undefined;
+  }
+
+  const blocks = findMermaidBlocks(editor.document);
+  if (blocks.length === 0) {
+    vscode.window.showWarningMessage('No mermaid blocks found in JSDoc comments.');
+    return undefined;
+  }
+
+  if (blocks.length === 1) {
+    return blocks[0].code;
+  }
+
+  const picked = await vscode.window.showQuickPick(
+    blocks.map((block) => ({
+      label: `Line ${block.startLine + 1}`,
+      description: block.code.split('\n')[0]?.trim() ?? '',
+      block,
+    })),
+    { placeHolder: 'Select a mermaid diagram' }
+  );
+
+  return picked?.block.code;
+}
+
 class MermaidCodeLensProvider implements vscode.CodeLensProvider {
   provideCodeLenses(document: vscode.TextDocument): vscode.CodeLens[] {
-    return findMermaidBlocks(document).map((block) => {
+    return findMermaidBlocks(document).flatMap((block) => {
       const range = new vscode.Range(block.startLine, 0, block.startLine, 0);
-      return new vscode.CodeLens(range, {
-        title: '▶ Open in Mermaid Live',
-        command: 'mermaidJsdocViewer.openDiagram',
-        arguments: [block.code],
-      });
+      return [
+        new vscode.CodeLens(range, {
+          title: '▶ Open in Mermaid Live',
+          command: 'mermaidJsdocViewer.openDiagram',
+          arguments: [block.code],
+        }),
+        new vscode.CodeLens(range, {
+          title: 'Display',
+          command: 'mermaidJsdocViewer.displayDiagram',
+          arguments: [block.code],
+        }),
+      ];
     });
   }
 }
@@ -117,45 +203,21 @@ export function activate(context: vscode.ExtensionContext): void {
   );
 
   context.subscriptions.push(
-    vscode.commands.registerCommand(
-      'mermaidJsdocViewer.openDiagram',
-      async (code?: string) => {
-        if (code) {
-          await openInMermaidLive(code);
-          return;
-        }
-
-        const editor = vscode.window.activeTextEditor;
-        if (!editor) {
-          vscode.window.showWarningMessage('No active editor.');
-          return;
-        }
-
-        const blocks = findMermaidBlocks(editor.document);
-        if (blocks.length === 0) {
-          vscode.window.showWarningMessage('No mermaid blocks found in JSDoc comments.');
-          return;
-        }
-
-        if (blocks.length === 1) {
-          await openInMermaidLive(blocks[0].code);
-          return;
-        }
-
-        const picked = await vscode.window.showQuickPick(
-          blocks.map((block) => ({
-            label: `Line ${block.startLine + 1}`,
-            description: block.code.split('\n')[0]?.trim() ?? '',
-            block,
-          })),
-          { placeHolder: 'Select a mermaid diagram to open' }
-        );
-
-        if (picked) {
-          await openInMermaidLive(picked.block.code);
-        }
+    vscode.commands.registerCommand('mermaidJsdocViewer.openDiagram', async (code?: string) => {
+      const resolved = await resolveCode(code);
+      if (resolved) {
+        await openInMermaidLive(resolved);
       }
-    )
+    })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('mermaidJsdocViewer.displayDiagram', async (code?: string) => {
+      const resolved = await resolveCode(code);
+      if (resolved) {
+        displayDiagram(resolved);
+      }
+    })
   );
 }
 
