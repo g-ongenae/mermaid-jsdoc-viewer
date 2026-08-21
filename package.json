@@ -2,7 +2,7 @@
   "name": "mermaid-jsdoc-viewer",
   "displayName": "Mermaid JSDoc Viewer",
   "description": "Open Mermaid diagrams found in JSDoc comments directly in the Mermaid Live editor",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "publisher": "gongenae",
   "repository": {
     "type": "git",

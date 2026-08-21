@@ -33,6 +33,7 @@ async function main() {
     outfile: 'dist/extension.js',
     external: ['vscode'],
     sourcemap: !production,
+    minify: production,
     plugins: [watchLogPlugin],
   });
 
