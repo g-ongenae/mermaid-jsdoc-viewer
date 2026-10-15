@@ -1,7 +1,7 @@
 # Mermaid JSDoc Viewer
 
 A VS Code extension that previews the ` ```mermaid ` diagrams written in your
-JSDoc comments, or opens them in the [Mermaid Live](https://mermaid.live)
+JSDoc comments and Markdown files, or opens them in the [Mermaid Live](https://mermaid.live)
 editor, straight from the code.
 
 ![The Display panel rendering a diagram from a JSDoc comment](assets/screenshot-display.png)

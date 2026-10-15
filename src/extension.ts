@@ -71,6 +71,58 @@ function findMermaidBlocks(document: vscode.TextDocument): MermaidBlock[] {
 }
 
 /**
+ * Scans a Markdown document for ```mermaid (or ~~~mermaid) fenced code blocks.
+ * Other fences are tracked too, so a mermaid fence shown as an example inside
+ * another code block is not mistaken for a diagram.
+ */
+function findMarkdownMermaidBlocks(document: vscode.TextDocument): MermaidBlock[] {
+  const blocks: MermaidBlock[] = [];
+
+  let fence: { char: string; length: number; indent: number; isMermaid: boolean } | undefined;
+  let startLine = -1;
+  let lines: string[] = [];
+
+  for (let i = 0; i < document.lineCount; i++) {
+    const rawLine = document.lineAt(i).text;
+
+    if (!fence) {
+      const open = /^( {0,3})(`{3,}|~{3,})\s*([^`]*)$/.exec(rawLine);
+      if (open) {
+        fence = {
+          char: open[2][0],
+          length: open[2].length,
+          indent: open[1].length,
+          isMermaid: open[3].trim().split(/\s+/)[0] === 'mermaid',
+        };
+        startLine = i;
+        lines = [];
+      }
+      continue;
+    }
+
+    const close = /^ {0,3}(`{3,}|~{3,})\s*$/.exec(rawLine);
+    if (close && close[1][0] === fence.char && close[1].length >= fence.length) {
+      if (fence.isMermaid) {
+        blocks.push({ startLine, endLine: i, code: lines.join('\n') });
+      }
+      fence = undefined;
+      continue;
+    }
+
+    // Content lines lose up to the opening fence's indentation, as in CommonMark.
+    lines.push(rawLine.replace(new RegExp(`^ {0,${fence.indent}}`), '').trimEnd());
+  }
+
+  return blocks;
+}
+
+function findBlocks(document: vscode.TextDocument): MermaidBlock[] {
+  return document.languageId === 'markdown'
+    ? findMarkdownMermaidBlocks(document)
+    : findMermaidBlocks(document);
+}
+
+/**
  * Compresses mermaid source into the `pako:` state encoding shared by
  * https://mermaid.live and https://mermaid.ink.
  */
@@ -282,9 +334,13 @@ async function resolveCode(code?: string): Promise<string | undefined> {
     return undefined;
   }
 
-  const blocks = findMermaidBlocks(editor.document);
+  const blocks = findBlocks(editor.document);
   if (blocks.length === 0) {
-    vscode.window.showWarningMessage('No mermaid blocks found in JSDoc comments.');
+    vscode.window.showWarningMessage(
+      editor.document.languageId === 'markdown'
+        ? 'No mermaid blocks found in this Markdown file.'
+        : 'No mermaid blocks found in JSDoc comments.'
+    );
     return undefined;
   }
 
@@ -306,7 +362,7 @@ async function resolveCode(code?: string): Promise<string | undefined> {
 
 class MermaidCodeLensProvider implements vscode.CodeLensProvider {
   provideCodeLenses(document: vscode.TextDocument): vscode.CodeLens[] {
-    return findMermaidBlocks(document).flatMap((block) => {
+    return findBlocks(document).flatMap((block) => {
       const range = new vscode.Range(block.startLine, 0, block.startLine, 0);
       return [
         new vscode.CodeLens(range, {
@@ -330,6 +386,7 @@ export function activate(context: vscode.ExtensionContext): void {
     'javascriptreact',
     'typescript',
     'typescriptreact',
+    'markdown',
   ];
 
   context.subscriptions.push(

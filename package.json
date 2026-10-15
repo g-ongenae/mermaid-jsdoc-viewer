@@ -1,7 +1,7 @@
 {
   "name": "mermaid-jsdoc-viewer",
   "displayName": "Mermaid JSDoc Viewer",
-  "description": "Open Mermaid diagrams found in JSDoc comments directly in the Mermaid Live editor",
+  "description": "Open Mermaid diagrams found in JSDoc comments and Markdown files directly in the Mermaid Live editor",
   "version": "0.0.3",
   "publisher": "gongenae",
   "repository": {
@@ -30,7 +30,8 @@
     "onLanguage:javascript",
     "onLanguage:javascriptreact",
     "onLanguage:typescript",
-    "onLanguage:typescriptreact"
+    "onLanguage:typescriptreact",
+    "onLanguage:markdown"
   ],
   "main": "./dist/extension.js",
   "contributes": {
@@ -48,12 +49,12 @@
       "editor/context": [
         {
           "command": "mermaidJsdocViewer.openDiagram",
-          "when": "editorLangId =~ /^javascript(react)?$|^typescript(react)?$/",
+          "when": "editorLangId =~ /^javascript(react)?$|^typescript(react)?$|^markdown$/",
           "group": "navigation"
         },
         {
           "command": "mermaidJsdocViewer.displayDiagram",
-          "when": "editorLangId =~ /^javascript(react)?$|^typescript(react)?$/",
+          "when": "editorLangId =~ /^javascript(react)?$|^typescript(react)?$|^markdown$/",
           "group": "navigation"
         }
       ]

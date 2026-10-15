@@ -18,6 +18,10 @@ The extension activates in JavaScript and TypeScript files (`.js`, `.jsx`,
 export function processOrder(order) {}
 ```
 
+It also activates in Markdown files (`.md`), where it picks up every top-level
+` ```mermaid ` (or `~~~mermaid`) fenced code block. A mermaid fence shown as an
+example inside another code block is ignored.
+
 ## CodeLenses
 
 Two CodeLenses appear above every detected diagram:
@@ -40,8 +44,8 @@ If the file has more than one diagram, you are asked to pick one.
 
 ## How a diagram reaches mermaid.live
 
-1. The extension finds the ` ```mermaid ` fence inside the JSDoc comment and
-   strips the leading ` * ` of each line.
+1. The extension finds the ` ```mermaid ` fence (inside the JSDoc comment, or
+   directly in a Markdown file) and strips the leading ` * ` of each JSDoc line.
 2. It wraps the source in the state object mermaid.live expects and compresses
    it with [pako](https://github.com/nodeca/pako).
 3. It opens `https://mermaid.live/edit#pako:<compressed-state>`. The
