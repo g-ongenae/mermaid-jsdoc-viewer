@@ -1,45 +1,28 @@
 # Mermaid JSDoc Viewer
 
-Opens Mermaid diagrams found inside JSDoc comments directly in the
-[Mermaid Live](https://mermaid.live) editor.
+A VS Code extension that previews the ` ```mermaid ` diagrams written in your
+JSDoc comments, or opens them in the [Mermaid Live](https://mermaid.live)
+editor, straight from the code.
 
-## What it does
+![The Display panel rendering a diagram from a JSDoc comment](assets/screenshot-display.png)
 
-1. Detects ` ```mermaid ` fenced code blocks inside `/** ... */` JSDoc comments.
-2. Serializes the mermaid source into the state object mermaid.live expects,
-   and compresses it with [pako](https://github.com/nodeca/pako).
-3. Opens `https://mermaid.live/edit#pako:<compressed-state>` in your browser.
+## Installation
 
-## Usage
-
-- A "▶ Open in Mermaid Live" CodeLens appears above every detected diagram
-  in JS/TS files — click it to open that diagram in the full mermaid.live
-  editor.
-- A "Display" CodeLens next to it renders the diagram (as SVG, via
-  [mermaid.ink](https://mermaid.ink)) in a panel beside the editor. Scroll to
-  zoom, drag to pan, or use the +/−/⟳ toolbar; double-click resets the view.
-- Both are also available as commands (**Mermaid JSDoc: Open in Mermaid
-  Live** / **Mermaid JSDoc: Display Diagram**) from the command palette or
-  the editor's right-click menu. If the file has more than one diagram,
-  you'll be prompted to pick which one.
-
-## Development
+Download the `.vsix` of the
+[latest release](https://github.com/g-ongenae/mermaid-jsdoc-viewer/releases/latest)
+and install it:
 
 ```bash
-npm install
-npm run compile   # or `npm run watch`
+code --install-extension mermaid-jsdoc-viewer-<version>.vsix
 ```
 
-Press `F5` in VS Code to launch an Extension Development Host with the
-extension loaded.
+## Documentation
 
-## Packaging / publishing
+- [Usage](docs/usage.md): the CodeLenses, the commands and how a diagram reaches
+  mermaid.live.
+- [Development](docs/development.md): building, debugging and packaging the
+  extension.
 
-The extension is bundled into a single `dist/extension.js` with esbuild
-(`npm run package`), so the published `.vsix` doesn't ship raw
-`node_modules` or dev files:
+## License
 
-```bash
-npx @vscode/vsce package   # produces mermaid-jsdoc-viewer-<version>.vsix
-npx @vscode/vsce publish   # requires `vsce login <publisher>` first
-```
+[MIT](LICENSE)
